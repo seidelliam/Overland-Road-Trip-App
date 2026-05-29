@@ -1,65 +1,97 @@
-import Image from "next/image";
+import { LandingForm } from '@/components/landing/landing-form';
+import { Compass, Sparkles, Map as MapIcon, Wallet } from 'lucide-react';
+
+const FEATURES = [
+  {
+    icon: MapIcon,
+    title: 'Visual route planning',
+    description:
+      'Drop pins on a beautiful map. Compare multiple routes for the same trip side-by-side.',
+  },
+  {
+    icon: Sparkles,
+    title: 'AI suggestions',
+    description:
+      'Stuck for ideas? Claude suggests stops, scenic detours, and overnight options.',
+  },
+  {
+    icon: Wallet,
+    title: 'Budget + overnights',
+    description:
+      'Track gas, food, and lodging. Mark which stops are sleep nights.',
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="relative flex-1 grid-bg overflow-hidden">
+      {/* Hero glow */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[900px] rounded-full bg-accent/10 blur-[120px]" />
+
+      <div className="relative mx-auto flex max-w-6xl flex-col px-6 py-16 sm:py-24">
+        {/* Logo */}
+        <div className="flex items-center gap-2 mb-16 animate-fade-up">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
+            <Compass className="h-5 w-5" />
+          </div>
+          <span className="font-semibold tracking-tight text-fg">Overland</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-start">
+          {/* Left: pitch */}
+          <div className="space-y-8 animate-fade-up" style={{ animationDelay: '50ms' }}>
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-fg-muted">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse-dot" />
+              Plan your next road trip
+            </div>
+
+            <h1 className="text-5xl sm:text-6xl font-semibold tracking-tight leading-[1.05]">
+              Map the route.{' '}
+              <span className="text-accent">Compare the options.</span>{' '}
+              Hit the road.
+            </h1>
+
+            <p className="text-lg text-fg-muted max-w-xl leading-relaxed">
+              An interactive planner for road trips. Sketch multiple routes for
+              the same trip, drop stops along the way, get AI ideas for what
+              not to miss, and share a code so everyone&apos;s on the same map.
+            </p>
+
+            <ul className="grid gap-4 sm:gap-3 pt-4">
+              {FEATURES.map(({ icon: Icon, title, description }, i) => (
+                <li
+                  key={title}
+                  className="flex gap-3 animate-fade-up"
+                  style={{ animationDelay: `${100 + i * 50}ms` }}
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface border border-border text-accent">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-fg">{title}</div>
+                    <div className="text-sm text-fg-muted">{description}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Right: form card */}
+          <div
+            className="animate-fade-up lg:sticky lg:top-12"
+            style={{ animationDelay: '200ms' }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <LandingForm />
+          </div>
         </div>
-      </main>
-    </div>
+
+        <footer className="mt-20 sm:mt-32 flex items-center justify-between border-t border-border pt-6 text-xs text-fg-subtle">
+          <div>Built for wanderers.</div>
+          <div className="flex items-center gap-4">
+            <span className="hidden sm:inline">Mapbox · Supabase · Claude</span>
+          </div>
+        </footer>
+      </div>
+    </main>
   );
 }

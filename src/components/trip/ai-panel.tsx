@@ -1,0 +1,227 @@
+'use client';
+
+import { useState } from 'react';
+import { Sparkles, Plus, Loader2, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Button } from '@/components/ui/button';
+import { Textarea, Label } from '@/components/ui/input';
+import { useTripStore } from '@/store/trip-store';
+import { CATEGORY_META, type StopCategory, type Stop } from '@/lib/types';
+import { toast } from 'sonner';
+
+type AISuggestion = {
+  name: string;
+  category: StopCategory;
+  lng: number;
+  lat: number;
+  description: string;
+  insertAfterStopIndex?: number;
+};
+
+import { useShallow } from '@/store/trip-store';
+
+const selectTrip = (s: any) => s.trip;
+const selectActiveRouteId = (s: any) => s.activeRouteId;
+const selectActiveRoute = (s: any) => s.activeRoute();
+const selectStopsForActive = (s: any): Stop[] =>
+  s.activeRouteId ? s.stopsForRoute(s.activeRouteId) : [];
+const selectAddStop = (s: any) => s.addStop;
+
+export function AIPanel() {
+  const trip = useTripStore(selectTrip);
+  const activeRouteId = useTripStore(selectActiveRouteId);
+  const activeRoute = useTripStore(selectActiveRoute);
+  const stops = useTripStore(useShallow(selectStopsForActive));
+  const addStop = useTripStore(selectAddStop);
+
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
+  const [open, setOpen] = useState(false);
+
+  async function generate() {
+    if (!activeRouteId) {
+      toast.error('Pick a route first');
+      return;
+    }
+    setLoading(true);
+    setSuggestions([]);
+    try {
+      const res = await fetch('/api/ai-suggest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          trip: {
+            name: trip.name,
+            description: trip.description,
+            travelers: trip.travelers,
+            start_date: trip.start_date,
+            end_date: trip.end_date,
+          },
+          route: {
+            name: activeRoute?.name,
+            notes: activeRoute?.notes,
+          },
+          stops: stops.map((s) => ({
+            name: s.name,
+            category: s.category,
+            address: s.address,
+            position: s.position,
+          })),
+          prompt: prompt.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error ?? 'Could not get suggestions.');
+        return;
+      }
+      const data = await res.json();
+      setSuggestions(data.suggestions ?? []);
+      if (!data.suggestions?.length) {
+        toast.info("Claude didn't return any suggestions for this prompt.");
+      }
+    } catch (err) {
+      toast.error('Network error reaching Claude.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addSuggestion(s: AISuggestion) {
+    if (!activeRouteId) return;
+    await addStop({
+      routeId: activeRouteId,
+      name: s.name,
+      lng: s.lng,
+      lat: s.lat,
+      address: s.description,
+      category: s.category,
+    });
+    toast.success(`Added ${s.name}`);
+    setSuggestions((prev) => prev.filter((p) => p.name !== s.name));
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-gradient-to-br from-accent/5 via-surface to-surface p-3 space-y-3 relative overflow-hidden">
+      <div className="absolute -top-12 -right-12 h-32 w-32 rounded-full bg-accent/10 blur-2xl pointer-events-none" />
+
+      <button
+        onClick={() => setOpen(!open)}
+        className="relative w-full flex items-center justify-between"
+      >
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/15 text-accent">
+            <Sparkles className="h-3.5 w-3.5" />
+          </div>
+          <div className="text-left">
+            <div className="text-sm font-semibold text-fg">AI suggestions</div>
+            <div className="text-xs text-fg-muted">
+              Get ideas from Claude
+            </div>
+          </div>
+        </div>
+      </button>
+
+      <AnimatePresence>
+        {(open || suggestions.length > 0) && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-3 overflow-hidden relative"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="ai-prompt">What are you looking for?</Label>
+              <Textarea
+                id="ai-prompt"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Best scenic stops between my current waypoints, or hidden gems for a foodie trip…"
+                className="min-h-16 text-xs"
+              />
+            </div>
+
+            <Button
+              onClick={generate}
+              disabled={loading}
+              size="sm"
+              className="w-full"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Thinking…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Suggest stops
+                </>
+              )}
+            </Button>
+
+            {suggestions.length > 0 && (
+              <ul className="space-y-1.5 pt-1">
+                {suggestions.map((s, i) => {
+                  const meta = CATEGORY_META[s.category];
+                  return (
+                    <motion.li
+                      key={`${s.name}-${i}`}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="group rounded-lg border border-border bg-surface p-2.5"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs"
+                          style={{
+                            background: meta.color + '22',
+                            color: meta.color,
+                          }}
+                        >
+                          {meta.emoji}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-fg">
+                            {s.name}
+                          </div>
+                          <div className="text-xs text-fg-muted line-clamp-2 mt-0.5">
+                            {s.description}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => addSuggestion(s)}
+                            className="h-6 w-6 grid place-items-center rounded-md bg-accent/10 text-accent hover:bg-accent hover:text-bg transition-colors"
+                            aria-label="Add to route"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setSuggestions((prev) =>
+                                prev.filter((p) => p.name !== s.name),
+                              )
+                            }
+                            className="h-6 w-6 grid place-items-center rounded-md text-fg-muted hover:text-fg hover:bg-bg/50 transition-colors"
+                            aria-label="Dismiss"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.li>
+                  );
+                })}
+              </ul>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
