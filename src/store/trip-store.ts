@@ -17,6 +17,74 @@ import { ROUTE_COLORS } from '@/lib/types';
 
 export { useShallow };
 
+type GeoPoint = { lng: number; lat: number };
+
+// Great-circle distance in km — a cheap, dependency-free proxy for "how far
+// apart" two points are. Good enough to rank insertion gaps along a route.
+function haversineKm(a: GeoPoint, b: GeoPoint): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// Pick the stop index a new point should slot into so it sits where it makes
+// geographic sense along the route, rather than always at the end. Uses the
+// classic cheapest-insertion heuristic: for every gap between consecutive
+// waypoints (trip origin → stops → destination) measure the extra straight-line
+// distance inserting the point would add, and choose the smallest. Returns an
+// index in [0, ordered.length].
+function bestInsertionIndex(
+  point: GeoPoint,
+  ordered: Stop[],
+  trip: Trip,
+): number {
+  if (ordered.length === 0) return 0;
+
+  const origin =
+    trip?.origin_lng != null && trip?.origin_lat != null
+      ? { lng: trip.origin_lng, lat: trip.origin_lat }
+      : null;
+  const destination =
+    trip?.destination_lng != null && trip?.destination_lat != null
+      ? { lng: trip.destination_lng, lat: trip.destination_lat }
+      : null;
+
+  let bestIndex = ordered.length; // default to appending at the end
+  let bestCost = Infinity;
+
+  for (let i = 0; i <= ordered.length; i++) {
+    const left: GeoPoint | null = i === 0 ? origin : ordered[i - 1];
+    const right: GeoPoint | null =
+      i === ordered.length ? destination : ordered[i];
+
+    let cost: number;
+    if (left && right) {
+      cost =
+        haversineKm(left, point) +
+        haversineKm(point, right) -
+        haversineKm(left, right);
+    } else if (left) {
+      cost = haversineKm(left, point);
+    } else if (right) {
+      cost = haversineKm(point, right);
+    } else {
+      cost = 0;
+    }
+
+    if (cost < bestCost) {
+      bestCost = cost;
+      bestIndex = i;
+    }
+  }
+
+  return bestIndex;
+}
+
 type TripState = {
   trip: Trip;
   routes: Route[];
@@ -251,10 +319,39 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   addStop: async (input) => {
-    const { stops } = get();
-    const routeStops = stops.filter((s) => s.route_id === input.routeId);
-    const position = routeStops.length;
+    const { stops, trip } = get();
+    const routeStops = stops
+      .filter((s) => s.route_id === input.routeId)
+      .sort((a, b) => a.position - b.position);
+
+    // Slot the new stop where it fits best along the route rather than always
+    // tacking it onto the end.
+    const position = bestInsertionIndex(input, routeStops, trip);
+
     const supabase = createClient();
+
+    // Make room: every existing stop at or after the insertion point shifts
+    // down by one so positions stay contiguous and unique.
+    const shifted = routeStops.slice(position);
+    if (shifted.length > 0) {
+      const shiftIds = new Set(shifted.map((s) => s.id));
+      set((s) => ({
+        stops: s.stops.map((stop) =>
+          shiftIds.has(stop.id)
+            ? { ...stop, position: stop.position + 1 }
+            : stop,
+        ),
+      }));
+      await Promise.all(
+        shifted.map((stop) =>
+          supabase
+            .from('stops')
+            .update({ position: stop.position + 1 })
+            .eq('id', stop.id),
+        ),
+      );
+    }
+
     const { data, error } = await supabase
       .from('stops')
       .insert({

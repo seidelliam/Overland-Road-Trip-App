@@ -28,6 +28,12 @@ _(nothing queued)_
 
 ## Done
 
+### Auto-place new stops along the route (not just at the bottom)
+- [x] Adding a stop (map click or search) now slots it into the position along the route that makes the most geographic sense, instead of always appending to the end. Uses a cheapest-insertion heuristic — it measures the extra straight-line detour for every gap (trip origin → stops → destination) and picks the smallest ([src/store/trip-store.ts](../src/store/trip-store.ts), `bestInsertionIndex` + `addStop`). Existing stops shift down to keep positions contiguous; you can still drag/move it afterward.
+
+### Make every stop movable (incl. on mobile)
+- [x] Every stop row now has always-visible **up/down move buttons**, so reordering is deterministic and works on touch screens — native HTML5 drag-and-drop never fires on mobile, which is why the bottom stops felt "stuck." Desktop drag-and-drop is unchanged (grip still shows on hover) ([src/components/trip/stop-list.tsx](../src/components/trip/stop-list.tsx)).
+
 ### Per-leg drive distances ("how far each day")
 - [x] Each connector between stops now shows the **actual driving distance + time** for that leg (e.g. `124 mi · 2h 3m`), plus a leading "from <origin>" and trailing "to <destination>" leg when those are set — so you can see how much driving each day involves.
 - Mapbox Directions already returns per-leg figures; `getDirections` now passes `legs` through ([src/lib/mapbox.ts](../src/lib/mapbox.ts)) and they're cached on the route alongside geometry ([src/store/trip-store.ts](../src/store/trip-store.ts)). Rendered by a new `LegConnector` in [src/components/trip/stop-list.tsx](../src/components/trip/stop-list.tsx).

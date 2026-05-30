@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import {
   GripVertical,
+  ChevronUp,
+  ChevronDown,
   Trash2,
   Pencil,
   ArrowDown,
@@ -83,6 +85,19 @@ export function StopList() {
   const legBetween = (idx: number) => legs?.[idx + originOffset] ?? null;
   const dragging = dragIndex !== null;
 
+  // Deterministic reorder used by the up/down buttons — works on touch devices
+  // where native HTML5 drag-and-drop never fires.
+  function moveStop(from: number, to: number) {
+    if (to < 0 || to >= stops.length || to === from) return;
+    const reordered = [...stops];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    reorderStops(
+      activeRouteId,
+      reordered.map((s) => s.id),
+    );
+  }
+
   function commitDrop() {
     if (dragIndex === null || dropGap === null) {
       setDragIndex(null);
@@ -149,8 +164,26 @@ export function StopList() {
                   dragIndex === idx && 'opacity-40',
                 )}
               >
-                <div className="flex flex-col items-center pt-1.5 select-none">
-                  <GripVertical className="h-3 w-3 text-fg-subtle opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing" />
+                <div className="flex flex-col items-center pt-0.5 select-none">
+                  <button
+                    type="button"
+                    onClick={() => moveStop(idx, idx - 1)}
+                    disabled={idx === 0}
+                    aria-label="Move up"
+                    className="grid h-5 w-5 place-items-center rounded text-fg-subtle hover:text-fg hover:bg-bg/40 disabled:opacity-20 disabled:pointer-events-none"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                  <GripVertical className="hidden h-3 w-3 text-fg-subtle opacity-0 transition-opacity cursor-grab active:cursor-grabbing group-hover:opacity-100 lg:block" />
+                  <button
+                    type="button"
+                    onClick={() => moveStop(idx, idx + 1)}
+                    disabled={idx === stops.length - 1}
+                    aria-label="Move down"
+                    className="grid h-5 w-5 place-items-center rounded text-fg-subtle hover:text-fg hover:bg-bg/40 disabled:opacity-20 disabled:pointer-events-none"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
                 </div>
 
                 <div
