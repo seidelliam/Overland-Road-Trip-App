@@ -304,8 +304,13 @@ export function TripMap({
     });
 
     if (!bounds.isEmpty()) {
+      // Scale padding to the map size so fitBounds never overflows a short
+      // (e.g. 45vh mobile) canvas, which throws "Map cannot fit within canvas".
+      const canvas = map.getCanvas();
+      const padX = Math.min(80, Math.max(16, canvas.clientWidth / 6));
+      const padY = Math.min(80, Math.max(16, canvas.clientHeight / 6));
       map.fitBounds(bounds, {
-        padding: { top: 80, bottom: 80, left: 80, right: 80 },
+        padding: { top: padY, bottom: padY, left: padX, right: padX },
         maxZoom: 11,
         duration: 800,
       });
