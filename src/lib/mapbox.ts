@@ -14,36 +14,62 @@ export type RouteLeg = {
 export type DirectionsResult = {
   geometry: GeoJSON.LineString;
   distance: number; // meters
-  duration: number; // seconds
+  duration: number; // seconds (already calibrated, see DRIVE_TIME_CALIBRATION)
   // Per-segment distance/duration, one entry per pair of consecutive
   // waypoints (so coordinates.length - 1 entries).
   legs: RouteLeg[];
 };
 
+// Real-world calibration applied to the raw Mapbox drive time. Mapbox's figures
+// tend to run high vs. what people actually experience (≈110% of Google Maps in
+// spot checks), so we scale the duration to bring it in line. 1 = unchanged.
+// Only the *time* is adjusted — distances are left exactly as returned, so gas
+// and per-state pricing stay accurate. Tune this single number to taste.
+export const DRIVE_TIME_CALIBRATION = 0.9;
+
+type RawRoute = {
+  geometry: GeoJSON.LineString;
+  distance: number;
+  duration: number;
+  legs?: Array<{ distance: number; duration: number }>;
+};
+
+async function fetchRoute(
+  profile: 'driving-traffic' | 'driving',
+  coords: string,
+): Promise<RawRoute | null> {
+  const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return (data.routes?.[0] as RawRoute) ?? null;
+}
+
 export async function getDirections(
   coordinates: Array<[number, number]>, // [lng, lat]
 ): Promise<DirectionsResult | null> {
   if (coordinates.length < 2) return null;
-  // Mapbox accepts up to 25 coordinates per call for the driving profile.
+  // Mapbox accepts up to 25 coordinates per call.
   const coords = coordinates
     .slice(0, 25)
     .map(([lng, lat]) => `${lng},${lat}`)
     .join(';');
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
 
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const data = await res.json();
-  const route = data.routes?.[0];
+  // Prefer the traffic-aware profile for a more realistic ETA; fall back to the
+  // plain driving profile if it returns nothing (e.g. an unsupported request).
+  const route =
+    (await fetchRoute('driving-traffic', coords)) ??
+    (await fetchRoute('driving', coords));
   if (!route) return null;
+
   return {
-    geometry: route.geometry as GeoJSON.LineString,
+    geometry: route.geometry,
     distance: route.distance,
-    duration: route.duration,
+    duration: route.duration * DRIVE_TIME_CALIBRATION,
     legs: (route.legs ?? []).map(
-      (l: { distance: number; duration: number }): RouteLeg => ({
+      (l): RouteLeg => ({
         distance: l.distance,
-        duration: l.duration,
+        duration: l.duration * DRIVE_TIME_CALIBRATION,
       }),
     ),
   };

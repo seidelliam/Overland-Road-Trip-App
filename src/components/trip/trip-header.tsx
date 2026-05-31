@@ -1,12 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { Compass, Copy, Check, GitCompareArrows, Pencil } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  Compass,
+  Copy,
+  Check,
+  GitCompareArrows,
+  Pencil,
+  Sun,
+  Moon,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTripStore } from '@/store/trip-store';
+import { useTheme } from '@/lib/use-theme';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +24,13 @@ export function TripHeader() {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(trip.name);
+
+  const theme = useTheme((s) => s.theme);
+  const toggleTheme = useTheme((s) => s.toggle);
+  const initTheme = useTheme((s) => s.init);
+  // Reconcile React state with the saved preference (the inline script in
+  // layout.tsx already set the <html> attribute before paint).
+  useEffect(() => initTheme(), [initTheme]);
 
   async function copyCode() {
     await navigator.clipboard.writeText(trip.code);
@@ -36,7 +52,7 @@ export function TripHeader() {
   }
 
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur-md px-4 h-14 shrink-0">
+    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur-md px-4 h-14 shrink-0">
       <Link
         href="/"
         className="flex items-center gap-2 text-fg hover:text-accent transition-colors"
@@ -93,6 +109,19 @@ export function TripHeader() {
           <Check className="h-3 w-3" />
         ) : (
           <Copy className="h-3 w-3 opacity-60" />
+        )}
+      </button>
+
+      <button
+        onClick={toggleTheme}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-fg-muted transition-all hover:border-accent/40 hover:text-accent"
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? (
+          <Sun className="h-3.5 w-3.5" />
+        ) : (
+          <Moon className="h-3.5 w-3.5" />
         )}
       </button>
 

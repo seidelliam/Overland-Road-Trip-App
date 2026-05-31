@@ -28,6 +28,19 @@ _(nothing queued)_
 
 ## Done
 
+### More realistic drive-time estimate
+- [x] Three changes in [src/lib/mapbox.ts](../src/lib/mapbox.ts) + [src/lib/utils.ts](../src/lib/utils.ts) + [src/components/trip/route-summary.tsx](../src/components/trip/route-summary.tsx):
+  1. **Traffic-aware routing** — switched the Directions call from the plain `driving` profile to `driving-traffic` (falls back to `driving` if that returns nothing), so ETAs reflect typical congestion like Google does.
+  2. **Calibration knob** — `DRIVE_TIME_CALIBRATION` (currently `0.9`) scales the raw Mapbox time, which ran ~110% of Google in spot checks. Tune this one number to taste; it only touches *time*, not distance (gas stays accurate). Allowed under Mapbox ToS — it's just how we present a figure we fetched.
+  3. **"Driving days"** — the Drive time stat now shows `≈ N days @ 8h` (`DRIVING_HOURS_PER_DAY` in utils), so a 45h total reads as a ~6-day road trip instead of a nonstop marathon.
+- Note: existing routes keep their previously-cached time until their geometry refreshes (add/move/remove a stop, or change origin/destination) — only then are the new profile + calibration applied.
+
+### Light mode
+- [x] Added a light theme with a sun/moon toggle in the trip header; the choice persists in `localStorage` and is applied before paint (no flash) via an inline script in [src/app/layout.tsx](../src/app/layout.tsx). Theme state lives in [src/lib/use-theme.ts](../src/lib/use-theme.ts); the light palette overrides the design tokens under `:root[data-theme='light']` in [src/app/globals.css](../src/app/globals.css), so every component (and the Mapbox popup/scrollbar) adapts off the CSS vars. The Mapbox basemap also swaps to `light-v11` ([src/components/trip/trip-map.tsx](../src/components/trip/trip-map.tsx)). Defaults to dark.
+
+### Mobile layout redo — map scrolls away (replaces the earlier 45vh/"Full map" version)
+- [x] Scrapped the previous mobile approach (fixed map + "Full map"/expand button + internal scroll containers). Mobile is now a single vertically-scrolling document: the map is a **50vh band at the top** that scrolls up out of view as you scroll down to the stops; the header is sticky so trip controls stay reachable ([src/components/trip/trip-workspace.tsx](../src/components/trip/trip-workspace.tsx), [src/components/trip/trip-header.tsx](../src/components/trip/trip-header.tsx)). Desktop's fixed 400px-sidebar + full-height map split is unchanged. Entering pin-drop mode scrolls the map back into view.
+
 ### Auto-place new stops along the route (not just at the bottom)
 - [x] Adding a stop (map click or search) now slots it into the position along the route that makes the most geographic sense, instead of always appending to the end. Uses a cheapest-insertion heuristic — it measures the extra straight-line detour for every gap (trip origin → stops → destination) and picks the smallest ([src/store/trip-store.ts](../src/store/trip-store.ts), `bestInsertionIndex` + `addStop`). Existing stops shift down to keep positions contiguous; you can still drag/move it afterward.
 

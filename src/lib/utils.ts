@@ -28,6 +28,19 @@ export function formatDuration(seconds: number | null | undefined): string {
   return `${hours}h ${minutes}m`;
 }
 
+// A sustainable number of hours behind the wheel per day. Used to translate a
+// raw drive-time total into "days on the road," which is how people actually
+// plan road trips (nobody drives 45 hours straight).
+export const DRIVING_HOURS_PER_DAY = 8;
+
+export function driveDays(
+  seconds: number | null | undefined,
+  hoursPerDay = DRIVING_HOURS_PER_DAY,
+): number | null {
+  if (seconds == null || seconds <= 0) return null;
+  return Math.ceil(seconds / (hoursPerDay * 3600));
+}
+
 export function formatCurrency(amount: number | null | undefined): string {
   if (amount == null) return '$0';
   return new Intl.NumberFormat('en-US', {

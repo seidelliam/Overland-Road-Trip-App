@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl, { type LngLatLike, type Map as MapboxMap } from 'mapbox-gl';
 import { useTripStore } from '@/store/trip-store';
+import { useTheme } from '@/lib/use-theme';
 import { MAPBOX_TOKEN, reverseGeocode } from '@/lib/mapbox';
 import { CATEGORY_META, type Route, type Stop } from '@/lib/types';
 import { Loader2, Crosshair } from 'lucide-react';
@@ -11,7 +12,10 @@ mapboxgl.accessToken = MAPBOX_TOKEN;
 
 import { useShallow } from '@/store/trip-store';
 
-const MAP_STYLE = 'mapbox://styles/mapbox/dark-v11';
+const mapStyleFor = (theme: string) =>
+  theme === 'light'
+    ? 'mapbox://styles/mapbox/light-v11'
+    : 'mapbox://styles/mapbox/dark-v11';
 
 const selectRoutes = (s: any): Route[] => s.routes;
 const selectStops = (s: any): Stop[] => s.stops;
@@ -36,6 +40,9 @@ export function TripMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
+  // The theme the current basemap was built/swapped to — lets us skip a
+  // redundant setStyle on first mount without sniffing the style URL.
+  const appliedThemeRef = useRef<string | null>(null);
   const [styleReady, setStyleReady] = useState(false);
 
   const routesFromStore = useTripStore(useShallow(selectRoutes));
@@ -44,16 +51,19 @@ export function TripMap({
   const isAddingStop = useTripStore(selectIsAddingStop);
   const addStop = useTripStore(selectAddStop);
   const setAddingStop = useTripStore(selectSetAddingStop);
+  const theme = useTheme((s) => s.theme);
 
   const routes = routesOverride ?? routesFromStore;
   const stops = stopsOverride ?? stopsFromStore;
 
-  // Initialize map once.
+  // Initialize map once. Read the theme imperatively so the map isn't torn down
+  // and rebuilt on theme changes — those are handled by setStyle below.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    appliedThemeRef.current = useTheme.getState().theme;
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: MAP_STYLE,
+      style: mapStyleFor(appliedThemeRef.current),
       center: [-98.5795, 39.8283], // Center of US
       zoom: 3.5,
       interactive,
@@ -79,6 +89,20 @@ export function TripMap({
       mapRef.current = null;
     };
   }, [interactive]);
+
+  // Swap the basemap when the app theme changes. setStyle drops style-owned
+  // layers/sources, so we flip styleReady off; the 'style.load' handler set up
+  // above flips it back on, which re-runs the route/marker draw effects. DOM
+  // markers survive setStyle untouched.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Already on this theme's basemap (e.g. first mount) — nothing to do.
+    if (appliedThemeRef.current === theme) return;
+    appliedThemeRef.current = theme;
+    setStyleReady(false);
+    map.setStyle(mapStyleFor(theme));
+  }, [theme]);
 
   // Cursor for "click to add" mode.
   useEffect(() => {

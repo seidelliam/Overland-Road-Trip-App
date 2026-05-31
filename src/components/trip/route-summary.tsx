@@ -1,7 +1,13 @@
 'use client';
 
 import { useTripStore, useShallow } from '@/store/trip-store';
-import { formatDistance, formatDuration, formatCurrency } from '@/lib/utils';
+import {
+  formatDistance,
+  formatDuration,
+  formatCurrency,
+  driveDays,
+  DRIVING_HOURS_PER_DAY,
+} from '@/lib/utils';
 import { Route, Clock, Wallet, Bed } from 'lucide-react';
 import type { Stop } from '@/lib/types';
 
@@ -22,6 +28,8 @@ export function RouteSummary() {
     .filter((s) => s.category === 'overnight')
     .reduce((sum, s) => sum + (s.nights || 1), 0);
 
+  const days = driveDays(active.duration_seconds);
+
   return (
     <div className="grid grid-cols-2 gap-2">
       <Stat
@@ -33,6 +41,11 @@ export function RouteSummary() {
         icon={<Clock className="h-3.5 w-3.5" />}
         label="Drive time"
         value={formatDuration(active.duration_seconds)}
+        sub={
+          days
+            ? `≈ ${days} ${days === 1 ? 'day' : 'days'} @ ${DRIVING_HOURS_PER_DAY}h`
+            : undefined
+        }
       />
       <Stat
         icon={<Bed className="h-3.5 w-3.5" />}
@@ -52,10 +65,12 @@ function Stat({
   icon,
   label,
   value,
+  sub,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  sub?: string;
 }) {
   return (
     <div className="rounded-lg border border-border bg-surface px-3 py-2">
@@ -66,6 +81,7 @@ function Stat({
       <div className="text-sm font-semibold text-fg mt-0.5 font-mono">
         {value}
       </div>
+      {sub && <div className="text-[10px] text-fg-subtle mt-0.5">{sub}</div>}
     </div>
   );
 }

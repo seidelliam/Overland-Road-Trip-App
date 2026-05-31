@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Pin, MapPin, Maximize2, Minimize2 } from 'lucide-react';
+import { useEffect } from 'react';
+import { Pin, MapPin } from 'lucide-react';
 import { useTripStore } from '@/store/trip-store';
-import { cn } from '@/lib/utils';
 import type { Trip, Route, Stop, BudgetItem } from '@/lib/types';
 import { TripHeader } from './trip-header';
 import { TripMap } from './trip-map';
@@ -31,7 +30,6 @@ export function TripWorkspace({
   const hydrate = useTripStore((s) => s.hydrate);
   const isAddingStop = useTripStore((s) => s.isAddingStop);
   const setAddingStop = useTripStore((s) => s.setAddingStop);
-  const [mapExpanded, setMapExpanded] = useState(false);
 
   useEffect(() => {
     hydrate({
@@ -56,68 +54,39 @@ export function TripWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-expand map on mobile when the user enters pin-drop mode.
+  // On mobile the map is a band at the top; when the user starts pin-drop mode
+  // (the button lives below the map), scroll it back into view so they can tap.
   useEffect(() => {
-    if (isAddingStop) setMapExpanded(true);
+    if (isAddingStop && typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }, [isAddingStop]);
 
   return (
-    <div className="flex flex-1 flex-col h-screen overflow-hidden bg-bg">
+    <div className="flex flex-col bg-bg lg:h-screen lg:overflow-hidden">
       <TripHeader />
 
       {/*
-       * Mobile (< lg):  flex-col — map at top, sidebar scrolls below.
-       * Desktop (lg+):  flex-row — sidebar fixed-width left, map fills right.
+       * Mobile (< lg):  one vertically-scrolling document. The map is a 50vh
+       *   band at the top that scrolls up out of view as you scroll to the
+       *   stops below — no internal scroll containers.
+       * Desktop (lg+):  fixed full-height split — 400px sidebar on the left
+       *   (lg:order-first), map filling the right.
        */}
-      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
+      <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row lg:overflow-hidden">
         {/* ── Map ───────────────────────────────────────────────────────────
-         *  Mobile:  fixed height (45 vh) unless expanded; sits at top.
-         *  Desktop: flex-1, naturally on the right because sidebar uses
-         *           lg:order-first to pull itself to the left.
+         *  Mobile:  50vh band at the top; scrolls away with the page.
+         *  Desktop: fills the right (sidebar uses lg:order-first to sit left).
          */}
-        <div
-          className={cn(
-            'relative shrink-0 lg:shrink lg:flex-1',
-            mapExpanded ? 'flex-1' : 'h-[45vh] lg:h-auto',
-          )}
-        >
+        <div className="relative h-[50vh] shrink-0 lg:h-auto lg:flex-1">
           <TripMap />
-
-          {/* Expand / collapse button — mobile only */}
-          <button
-            onClick={() => setMapExpanded((v) => !v)}
-            className="absolute bottom-3 right-3 z-10 lg:hidden flex items-center gap-1.5 rounded-lg bg-surface/90 backdrop-blur-sm border border-border px-3 py-1.5 text-xs font-medium text-fg hover:border-accent/50 hover:text-accent transition-all"
-          >
-            {mapExpanded ? (
-              <>
-                <Minimize2 className="h-3.5 w-3.5" />
-                Collapse
-              </>
-            ) : (
-              <>
-                <Maximize2 className="h-3.5 w-3.5" />
-                Full map
-              </>
-            )}
-          </button>
         </div>
 
         {/* ── Sidebar ───────────────────────────────────────────────────────
-         *  Mobile:  flex-1 remaining height, border-t, scrolls as a whole.
-         *  Desktop: fixed 400 px, border-r, internal div scrolls (lg:order-first
-         *           moves this panel to the left in the flex-row).
+         *  Mobile:  flows below the map in normal document scroll.
+         *  Desktop: fixed 400px, border-r, internal div scrolls.
          */}
-        <aside
-          className={cn(
-            'flex flex-col border-border bg-surface/40',
-            // Desktop positioning & sizing
-            'lg:w-[400px] lg:shrink-0 lg:border-r lg:overflow-hidden lg:order-first',
-            // Mobile: take remaining height and scroll as one container
-            'flex-1 overflow-y-auto border-t lg:border-t-0',
-            // Hide sidebar when map is fullscreened on mobile
-            mapExpanded && 'hidden lg:flex lg:flex-col',
-          )}
-        >
+        <aside className="flex flex-col border-border bg-surface/40 border-t lg:w-[400px] lg:shrink-0 lg:border-r lg:border-t-0 lg:overflow-hidden lg:order-first">
           <div className="p-4 border-b border-border space-y-3 shrink-0">
             <div>
               <div className="text-[10px] font-medium uppercase tracking-wider text-fg-muted mb-2">

@@ -22,6 +22,27 @@
   --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Light theme — overrides the @theme defaults above. Toggled by setting
+   data-theme="light" on <html> (see use-theme.ts + the no-flash script in
+   layout.tsx). Everything is driven off these CSS vars, so components and the
+   Mapbox popup/scrollbar overrides adapt automatically. */
+:root[data-theme='light'] {
+  --color-bg: #f4f7f6;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef2f1;
+  --color-border: #dde5e3;
+  --color-border-strong: #c5d0cd;
+  --color-fg: #0e1715;
+  --color-fg-muted: #4c5957;
+  --color-fg-subtle: #7c8a87;
+
+  --color-accent: #059669;
+  --color-accent-bright: #10b981;
+  --color-accent-deep: #065f46;
+  --color-warn: #b45309;
+  --color-danger: #dc2626;
+}
+
 @layer base {
   html,
   body {
