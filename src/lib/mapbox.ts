@@ -25,7 +25,7 @@ export type DirectionsResult = {
 // spot checks), so we scale the duration to bring it in line. 1 = unchanged.
 // Only the *time* is adjusted — distances are left exactly as returned, so gas
 // and per-state pricing stay accurate. Tune this single number to taste.
-export const DRIVE_TIME_CALIBRATION = 0.9;
+export const DRIVE_TIME_CALIBRATION = 1.0;
 
 type RawRoute = {
   geometry: GeoJSON.LineString;
