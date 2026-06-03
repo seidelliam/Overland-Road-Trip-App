@@ -9,6 +9,7 @@ import type {
   BudgetItem,
   StopCategory,
   BudgetCategory,
+  AISuggestion,
 } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { getDirections, statesAlongRoute } from '@/lib/mapbox';
@@ -94,6 +95,12 @@ type TripState = {
   isAddingStop: boolean;
   comparingRouteIds: string[]; // for compare view
 
+  // Claude's not-yet-added location ideas, rendered as ghost waypoints on the
+  // map. `hoveredSuggestionId` links a hovered panel row to its map marker (and
+  // vice versa) so the two stay visually in sync.
+  aiSuggestions: AISuggestion[];
+  hoveredSuggestionId: string | null;
+
   // selectors
   activeRoute: () => Route | undefined;
   stopsForRoute: (routeId: string) => Stop[];
@@ -114,6 +121,10 @@ type TripState = {
   setAddingStop: (v: boolean) => void;
   toggleCompare: (id: string) => void;
   clearCompare: () => void;
+
+  setAiSuggestions: (list: AISuggestion[]) => void;
+  dismissSuggestion: (id: string) => void;
+  setHoveredSuggestion: (id: string | null) => void;
 
   addRoute: () => Promise<void>;
   updateRoute: (id: string, patch: Partial<Route>) => Promise<void>;
@@ -151,6 +162,8 @@ export const useTripStore = create<TripState>((set, get) => ({
   activeRouteId: null,
   isAddingStop: false,
   comparingRouteIds: [],
+  aiSuggestions: [],
+  hoveredSuggestionId: null,
 
   activeRoute: () => get().routes.find((r) => r.id === get().activeRouteId),
   stopsForRoute: (routeId) =>
@@ -219,6 +232,15 @@ export const useTripStore = create<TripState>((set, get) => ({
         : [...s.comparingRouteIds, id].slice(-3),
     })),
   clearCompare: () => set({ comparingRouteIds: [] }),
+
+  setAiSuggestions: (list) => set({ aiSuggestions: list }),
+  dismissSuggestion: (id) =>
+    set((s) => ({
+      aiSuggestions: s.aiSuggestions.filter((x) => x.id !== id),
+      hoveredSuggestionId:
+        s.hoveredSuggestionId === id ? null : s.hoveredSuggestionId,
+    })),
+  setHoveredSuggestion: (id) => set({ hoveredSuggestionId: id }),
 
   addRoute: async () => {
     const { trip, routes } = get();

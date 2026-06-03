@@ -12,6 +12,7 @@ import { StopSearch } from './stop-search';
 import { RouteSummary } from './route-summary';
 import { BudgetPanel } from './budget-panel';
 import { AIPanel } from './ai-panel';
+import { ItineraryPanel } from './itinerary-panel';
 import { VehiclePanel } from './vehicle-panel';
 import { EstimateCostsButton } from './estimate-costs-button';
 import { Button } from '@/components/ui/button';
@@ -131,6 +132,8 @@ export function TripWorkspace({
               </div>
               <StopList />
             </div>
+
+            <ItineraryPanel />
 
             <AIPanel />
 

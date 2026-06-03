@@ -71,6 +71,19 @@ export type Stop = {
   created_at: string;
 };
 
+// A location Claude proposed but the user hasn't committed to the route yet.
+// Lives only in client state (never persisted) so the map can render it as a
+// lightweight "ghost" waypoint alongside the real stops.
+export type AISuggestion = {
+  id: string;
+  name: string;
+  category: StopCategory;
+  lng: number;
+  lat: number;
+  description: string;
+  insertAfterStopIndex?: number;
+};
+
 export type BudgetItem = {
   id: string;
   trip_id: string;

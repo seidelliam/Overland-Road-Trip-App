@@ -2,13 +2,23 @@
 
 import { create } from 'zustand';
 
-export type Theme = 'dark' | 'light';
+// The user-facing theme choice. 'outdoors' is a map style (Mapbox outdoors-v12)
+// that pairs with the light UI — see uiThemeFor.
+export type Theme = 'dark' | 'light' | 'outdoors';
+
+// Which set of UI color tokens a theme uses. Outdoors is a bright topographic
+// basemap, so it rides the light palette.
+export function uiThemeFor(theme: Theme): 'dark' | 'light' {
+  return theme === 'dark' ? 'dark' : 'light';
+}
 
 // Apply the theme to <html> and persist it. Kept outside React so the basemap,
-// the toggle, and the no-flash inline script in layout.tsx all agree.
+// the picker, and the no-flash inline script in layout.tsx all agree. The
+// data-theme attribute only ever carries the UI palette ('dark' | 'light');
+// the full choice (incl. 'outdoors') lives in localStorage.
 function apply(theme: Theme) {
   if (typeof document === 'undefined') return;
-  document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.theme = uiThemeFor(theme);
   try {
     localStorage.setItem('theme', theme);
   } catch {
@@ -19,7 +29,6 @@ function apply(theme: Theme) {
 type ThemeState = {
   theme: Theme;
   setTheme: (t: Theme) => void;
-  toggle: () => void;
   /** Read the saved preference from localStorage (call once on mount). */
   init: () => void;
 };
@@ -32,12 +41,11 @@ export const useTheme = create<ThemeState>((set, get) => ({
     apply(theme);
     set({ theme });
   },
-  toggle: () => get().setTheme(get().theme === 'dark' ? 'light' : 'dark'),
   init: () => {
     let saved: Theme = 'dark';
     try {
       const v = localStorage.getItem('theme');
-      if (v === 'light' || v === 'dark') saved = v;
+      if (v === 'light' || v === 'dark' || v === 'outdoors') saved = v;
     } catch {
       // ignore
     }

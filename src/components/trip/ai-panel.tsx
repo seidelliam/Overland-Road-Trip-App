@@ -6,17 +6,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Textarea, Label } from '@/components/ui/input';
 import { useTripStore } from '@/store/trip-store';
-import { CATEGORY_META, type StopCategory, type Stop } from '@/lib/types';
+import { CATEGORY_META, type Stop, type AISuggestion } from '@/lib/types';
 import { toast } from 'sonner';
-
-type AISuggestion = {
-  name: string;
-  category: StopCategory;
-  lng: number;
-  lat: number;
-  description: string;
-  insertAfterStopIndex?: number;
-};
 
 import { useShallow } from '@/store/trip-store';
 
@@ -26,6 +17,11 @@ const selectActiveRoute = (s: any) => s.activeRoute();
 const selectStopsForActive = (s: any): Stop[] =>
   s.activeRouteId ? s.stopsForRoute(s.activeRouteId) : [];
 const selectAddStop = (s: any) => s.addStop;
+const selectSuggestions = (s: any): AISuggestion[] => s.aiSuggestions;
+const selectSetSuggestions = (s: any) => s.setAiSuggestions;
+const selectDismissSuggestion = (s: any) => s.dismissSuggestion;
+const selectSetHovered = (s: any) => s.setHoveredSuggestion;
+const selectHoveredId = (s: any) => s.hoveredSuggestionId;
 
 export function AIPanel() {
   const trip = useTripStore(selectTrip);
@@ -33,10 +29,14 @@ export function AIPanel() {
   const activeRoute = useTripStore(selectActiveRoute);
   const stops = useTripStore(useShallow(selectStopsForActive));
   const addStop = useTripStore(selectAddStop);
+  const suggestions = useTripStore(useShallow(selectSuggestions));
+  const setSuggestions = useTripStore(selectSetSuggestions);
+  const dismissSuggestion = useTripStore(selectDismissSuggestion);
+  const setHovered = useTripStore(selectSetHovered);
+  const hoveredId = useTripStore(selectHoveredId);
 
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [open, setOpen] = useState(false);
 
   async function generate() {
@@ -46,6 +46,7 @@ export function AIPanel() {
     }
     setLoading(true);
     setSuggestions([]);
+    setOpen(true);
     try {
       const res = await fetch('/api/ai-suggest', {
         method: 'POST',
@@ -77,8 +78,17 @@ export function AIPanel() {
         return;
       }
       const data = await res.json();
-      setSuggestions(data.suggestions ?? []);
-      if (!data.suggestions?.length) {
+      const incoming: AISuggestion[] = (data.suggestions ?? []).map(
+        (s: Omit<AISuggestion, 'id'>) => ({
+          ...s,
+          id:
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `${s.name}-${s.lng},${s.lat}`,
+        }),
+      );
+      setSuggestions(incoming);
+      if (!incoming.length) {
         toast.info("Claude didn't return any suggestions for this prompt.");
       }
     } catch (err) {
@@ -100,7 +110,7 @@ export function AIPanel() {
       category: s.category,
     });
     toast.success(`Added ${s.name}`);
-    setSuggestions((prev) => prev.filter((p) => p.name !== s.name));
+    dismissSuggestion(s.id);
   }
 
   return (
@@ -164,16 +174,28 @@ export function AIPanel() {
             </Button>
 
             {suggestions.length > 0 && (
+              <p className="text-[11px] text-fg-muted pt-1">
+                Shown as dashed pins on the map — hover either to preview, click{' '}
+                <Plus className="inline h-3 w-3 -mt-0.5" /> to add.
+              </p>
+            )}
+
+            {suggestions.length > 0 && (
               <ul className="space-y-1.5 pt-1">
                 {suggestions.map((s, i) => {
                   const meta = CATEGORY_META[s.category];
+                  const isHovered = hoveredId === s.id;
                   return (
                     <motion.li
-                      key={`${s.name}-${i}`}
+                      key={s.id}
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.05 }}
-                      className="group rounded-lg border border-border bg-surface p-2.5"
+                      onMouseEnter={() => setHovered(s.id)}
+                      onMouseLeave={() => setHovered(null)}
+                      className={`group rounded-lg border bg-surface p-2.5 transition-colors ${
+                        isHovered ? 'border-accent' : 'border-border'
+                      }`}
                     >
                       <div className="flex items-start gap-2">
                         <span
@@ -202,11 +224,7 @@ export function AIPanel() {
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() =>
-                              setSuggestions((prev) =>
-                                prev.filter((p) => p.name !== s.name),
-                              )
-                            }
+                            onClick={() => dismissSuggestion(s.id)}
                             className="h-6 w-6 grid place-items-center rounded-md text-fg-muted hover:text-fg hover:bg-bg/50 transition-colors"
                             aria-label="Dismiss"
                           >

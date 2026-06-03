@@ -31,7 +31,7 @@ export default function RootLayout({
         {/* Apply the saved theme before paint to avoid a flash of the wrong one. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}`,
+            __html: `try{var t=localStorage.getItem('theme');document.documentElement.dataset.theme=(t==='light'||t==='outdoors')?'light':'dark';}catch(e){}`,
           }}
         />
         {children}

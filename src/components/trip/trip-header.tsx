@@ -10,14 +10,23 @@ import {
   Pencil,
   Sun,
   Moon,
+  Mountain,
+  Check as CheckIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTripStore } from '@/store/trip-store';
-import { useTheme } from '@/lib/use-theme';
+import { useTheme, type Theme } from '@/lib/use-theme';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+
+const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'outdoors', label: 'Outdoors', icon: Mountain },
+];
 
 export function TripHeader() {
   const trip = useTripStore((s) => s.trip);
@@ -26,11 +35,14 @@ export function TripHeader() {
   const [name, setName] = useState(trip.name);
 
   const theme = useTheme((s) => s.theme);
-  const toggleTheme = useTheme((s) => s.toggle);
+  const setTheme = useTheme((s) => s.setTheme);
   const initTheme = useTheme((s) => s.init);
   // Reconcile React state with the saved preference (the inline script in
   // layout.tsx already set the <html> attribute before paint).
   useEffect(() => initTheme(), [initTheme]);
+
+  const ActiveThemeIcon =
+    THEME_OPTIONS.find((o) => o.value === theme)?.icon ?? Moon;
 
   async function copyCode() {
     await navigator.clipboard.writeText(trip.code);
@@ -112,18 +124,38 @@ export function TripHeader() {
         )}
       </button>
 
-      <button
-        onClick={toggleTheme}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-fg-muted transition-all hover:border-accent/40 hover:text-accent"
-        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        {theme === 'dark' ? (
-          <Sun className="h-3.5 w-3.5" />
-        ) : (
-          <Moon className="h-3.5 w-3.5" />
-        )}
-      </button>
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger asChild>
+          <button
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-fg-muted transition-all hover:border-accent/40 hover:text-accent data-[state=open]:border-accent/40 data-[state=open]:text-accent"
+            aria-label="Change map theme"
+            title="Change map theme"
+          >
+            <ActiveThemeIcon className="h-3.5 w-3.5" />
+          </button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            className="z-50 min-w-[160px] rounded-lg border border-border bg-surface p-1 text-sm shadow-2xl"
+            align="end"
+            sideOffset={6}
+          >
+            {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+              <DropdownMenu.Item
+                key={value}
+                onSelect={() => setTheme(value)}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 outline-none hover:bg-surface-2"
+              >
+                <Icon className="h-3.5 w-3.5 text-fg-muted" />
+                <span className="flex-1">{label}</span>
+                {theme === value && (
+                  <CheckIcon className="h-3.5 w-3.5 text-accent" />
+                )}
+              </DropdownMenu.Item>
+            ))}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
 
       <Button variant="outline" size="sm" asChild>
         <Link href={`/trip/${trip.code}/compare`}>
