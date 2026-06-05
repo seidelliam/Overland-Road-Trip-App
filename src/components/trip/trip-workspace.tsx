@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Pin, MapPin } from 'lucide-react';
 import { useTripStore } from '@/store/trip-store';
 import type { Trip, Route, Stop, BudgetItem } from '@/lib/types';
 import { TripHeader } from './trip-header';
@@ -15,7 +14,6 @@ import { AIPanel } from './ai-panel';
 import { ItineraryPanel } from './itinerary-panel';
 import { VehiclePanel } from './vehicle-panel';
 import { EstimateCostsButton } from './estimate-costs-button';
-import { Button } from '@/components/ui/button';
 
 export function TripWorkspace({
   trip,
@@ -30,7 +28,6 @@ export function TripWorkspace({
 }) {
   const hydrate = useTripStore((s) => s.hydrate);
   const isAddingStop = useTripStore((s) => s.isAddingStop);
-  const setAddingStop = useTripStore((s) => s.setAddingStop);
 
   useEffect(() => {
     hydrate({
@@ -100,24 +97,6 @@ export function TripWorkspace({
 
           <div className="p-4 space-y-3 border-b border-border shrink-0">
             <StopSearch />
-            <Button
-              variant={isAddingStop ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setAddingStop(!isAddingStop)}
-              className="w-full"
-            >
-              {isAddingStop ? (
-                <>
-                  <MapPin className="h-3.5 w-3.5" />
-                  Click the map to drop a stop
-                </>
-              ) : (
-                <>
-                  <Pin className="h-3.5 w-3.5" />
-                  Drop pin on map
-                </>
-              )}
-            </Button>
           </div>
 
           {/* On desktop this div scrolls inside the fixed-height aside.

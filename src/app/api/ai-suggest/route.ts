@@ -21,6 +21,11 @@ const Suggestion = z.object({
     .describe(
       'One or two sentences on why this stop is worth visiting and what makes it unique.',
     ),
+  estimated_cost: z
+    .number()
+    .describe(
+      'Rough total cost in USD for the whole group to do this stop (tickets/meal/lodging as appropriate, scaled by traveler count and nights). Use 0 for free stops. Always provide a number.',
+    ),
 });
 
 const SuggestionsSchema = z.object({
@@ -43,6 +48,10 @@ A user is planning a route and wants stop suggestions. Your job is to recommend 
 
 If the user gives a specific prompt (e.g. "best taco trucks", "family-friendly hikes"), prioritize that. Otherwise, return a balanced set.
 
+For every suggestion, always include an \`estimated_cost\` (USD, whole group): tickets/entry, a meal, or a night's lodging as appropriate, scaled by the traveler count and trip dates. Use 0 for genuinely free stops (e.g. a scenic overlook).
+
+If the trip has a REMAINING BUDGET, treat it as a hard ceiling: the combined \`estimated_cost\` of your suggestions should comfortably fit within it (leave some slack), and skip options that would blow past it. Prefer a realistic mix the traveler could actually afford with what's left after their current stops and gas.
+
 Return between 3 and 8 suggestions. Skip anything you can't place confidently on a map.`;
 
 type TripContext = {
@@ -63,6 +72,11 @@ type TripContext = {
     address: string | null;
     position: number;
   }>;
+  budget?: {
+    target: number;
+    spent: number;
+    remaining: number;
+  };
   prompt?: string;
 };
 
@@ -118,6 +132,7 @@ export async function POST(request: Request) {
           name: s.name,
           category: s.category,
           description: s.description,
+          estimated_cost: s.estimated_cost,
           lng: hit.lng,
           lat: hit.lat,
         };
@@ -166,6 +181,17 @@ function buildUserMessage(ctx: TripContext): string {
     }
   } else {
     lines.push('\n## Current stops: none yet — this is a blank slate.');
+  }
+
+  if (ctx.budget) {
+    lines.push('\n## Budget');
+    lines.push(`Target budget for the trip: $${Math.round(ctx.budget.target)}`);
+    lines.push(
+      `Already committed (current stops + gas): $${Math.round(ctx.budget.spent)}`,
+    );
+    lines.push(
+      `REMAINING BUDGET to work within: $${Math.round(ctx.budget.remaining)} — keep the combined estimated_cost of your suggestions comfortably under this.`,
+    );
   }
 
   if (ctx.prompt) {

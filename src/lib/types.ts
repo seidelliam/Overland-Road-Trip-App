@@ -81,6 +81,9 @@ export type AISuggestion = {
   lng: number;
   lat: number;
   description: string;
+  // Rough total cost in USD for the whole group, when Claude is asked to fit a
+  // budget (null/undefined when no target budget was set).
+  estimated_cost?: number | null;
   insertAfterStopIndex?: number;
 };
 

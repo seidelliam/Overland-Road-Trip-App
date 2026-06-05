@@ -22,6 +22,11 @@ const selectSetSuggestions = (s: any) => s.setAiSuggestions;
 const selectDismissSuggestion = (s: any) => s.dismissSuggestion;
 const selectSetHovered = (s: any) => s.setHoveredSuggestion;
 const selectHoveredId = (s: any) => s.hoveredSuggestionId;
+const selectBudgetTarget = (s: any): number | null => s.budgetTarget;
+// "Spent so far" mirrors the budget panel: all stop costs + budget items + the
+// active route's gas. Used to tell Claude how much budget is left.
+const selectSpent = (s: any): number =>
+  s.tripTotal() + (s.activeRouteId ? s.gasCostForRoute(s.activeRouteId) : 0);
 
 export function AIPanel() {
   const trip = useTripStore(selectTrip);
@@ -34,6 +39,8 @@ export function AIPanel() {
   const dismissSuggestion = useTripStore(selectDismissSuggestion);
   const setHovered = useTripStore(selectSetHovered);
   const hoveredId = useTripStore(selectHoveredId);
+  const budgetTarget = useTripStore(selectBudgetTarget);
+  const spent = useTripStore(selectSpent);
 
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
@@ -69,6 +76,14 @@ export function AIPanel() {
             address: s.address,
             position: s.position,
           })),
+          budget:
+            budgetTarget != null
+              ? {
+                  target: budgetTarget,
+                  spent,
+                  remaining: Math.max(0, budgetTarget - spent),
+                }
+              : undefined,
           prompt: prompt.trim() || undefined,
         }),
       });
@@ -108,6 +123,7 @@ export function AIPanel() {
       lat: s.lat,
       address: s.description,
       category: s.category,
+      estimated_cost: s.estimated_cost ?? null,
     });
     toast.success(`Added ${s.name}`);
     dismissSuggestion(s.id);
@@ -208,8 +224,17 @@ export function AIPanel() {
                           {meta.emoji}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-fg">
-                            {s.name}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium text-fg truncate">
+                              {s.name}
+                            </span>
+                            {s.estimated_cost != null && (
+                              <span className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent tabular-nums">
+                                {s.estimated_cost > 0
+                                  ? `≈ $${Math.round(s.estimated_cost).toLocaleString()}`
+                                  : 'Free'}
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-fg-muted line-clamp-2 mt-0.5">
                             {s.description}

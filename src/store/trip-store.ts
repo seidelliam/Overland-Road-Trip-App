@@ -20,6 +20,25 @@ export { useShallow };
 
 type GeoPoint = { lng: number; lat: number };
 
+// Target budget is a client-only preference (no DB column), persisted per trip
+// in localStorage so it survives reloads without a migration.
+const budgetTargetKey = (tripId: string) => `budget-target:${tripId}`;
+
+function loadBudgetTarget(tripId: string | undefined): number | null {
+  if (!tripId || typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(budgetTargetKey(tripId));
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function saveBudgetTarget(tripId: string | undefined, value: number | null) {
+  if (!tripId || typeof window === 'undefined') return;
+  const key = budgetTargetKey(tripId);
+  if (value == null) window.localStorage.removeItem(key);
+  else window.localStorage.setItem(key, String(value));
+}
+
 // Great-circle distance in km — a cheap, dependency-free proxy for "how far
 // apart" two points are. Good enough to rank insertion gaps along a route.
 function haversineKm(a: GeoPoint, b: GeoPoint): number {
@@ -95,6 +114,11 @@ type TripState = {
   isAddingStop: boolean;
   comparingRouteIds: string[]; // for compare view
 
+  // Optional target budget for the trip. Client-only (persisted to localStorage
+  // per trip, no DB column) — drives the budget meter and lets AI suggestions
+  // fit within what's left after stops + gas.
+  budgetTarget: number | null;
+
   // Claude's not-yet-added location ideas, rendered as ghost waypoints on the
   // map. `hoveredSuggestionId` links a hovered panel row to its map marker (and
   // vice versa) so the two stay visually in sync.
@@ -119,6 +143,7 @@ type TripState = {
   updateTrip: (patch: Partial<Trip>) => Promise<void>;
   setActiveRoute: (id: string) => void;
   setAddingStop: (v: boolean) => void;
+  setBudgetTarget: (v: number | null) => void;
   toggleCompare: (id: string) => void;
   clearCompare: () => void;
 
@@ -138,6 +163,7 @@ type TripState = {
     lat: number;
     address?: string | null;
     category?: StopCategory;
+    estimated_cost?: number | null;
   }) => Promise<Stop | null>;
   updateStop: (id: string, patch: Partial<Stop>) => Promise<void>;
   removeStop: (id: string) => Promise<void>;
@@ -162,6 +188,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   activeRouteId: null,
   isAddingStop: false,
   comparingRouteIds: [],
+  budgetTarget: null,
   aiSuggestions: [],
   hoveredSuggestionId: null,
 
@@ -214,6 +241,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       budget,
       activeRouteId: routes[0]?.id ?? null,
       comparingRouteIds: [],
+      budgetTarget: loadBudgetTarget(trip.id),
     }),
 
   updateTrip: async (patch) => {
@@ -225,6 +253,10 @@ export const useTripStore = create<TripState>((set, get) => ({
 
   setActiveRoute: (id) => set({ activeRouteId: id }),
   setAddingStop: (v) => set({ isAddingStop: v }),
+  setBudgetTarget: (v) => {
+    set({ budgetTarget: v });
+    saveBudgetTarget(get().trip.id, v);
+  },
   toggleCompare: (id) =>
     set((s) => ({
       comparingRouteIds: s.comparingRouteIds.includes(id)
@@ -383,6 +415,7 @@ export const useTripStore = create<TripState>((set, get) => ({
         lat: input.lat,
         address: input.address ?? null,
         category: input.category ?? 'waypoint',
+        estimated_cost: input.estimated_cost ?? null,
         position,
       })
       .select('*')

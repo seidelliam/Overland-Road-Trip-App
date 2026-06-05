@@ -233,7 +233,7 @@ export function StopList() {
                   )}
                 </button>
 
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-0.5 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                   <button
                     onClick={() => setEditingStop(stop)}
                     className="h-7 w-7 grid place-items-center rounded-md text-fg-muted hover:text-fg hover:bg-bg/40"

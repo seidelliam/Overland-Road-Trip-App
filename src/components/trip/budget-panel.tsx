@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Trash2, Wallet } from 'lucide-react';
+import { Plus, Trash2, Wallet, Pencil, Check } from 'lucide-react';
 import { useTripStore } from '@/store/trip-store';
 import { BUDGET_META, type BudgetCategory, type BudgetItem, type Stop } from '@/lib/types';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,8 @@ const selectRemoveBudgetItem = (s: any) => s.removeBudgetItem;
 const selectStops = (s: any): Stop[] => s.stops;
 const selectGasCost = (s: any) =>
   s.activeRouteId ? s.gasCostForRoute(s.activeRouteId) : 0;
+const selectBudgetTarget = (s: any): number | null => s.budgetTarget;
+const selectSetBudgetTarget = (s: any) => s.setBudgetTarget;
 
 export function BudgetPanel() {
   const items = useTripStore(useShallow(selectBudgetItems));
@@ -26,11 +28,15 @@ export function BudgetPanel() {
   const removeBudgetItem = useTripStore(selectRemoveBudgetItem);
   const stops = useTripStore(useShallow(selectStops));
   const gasCost = useTripStore(selectGasCost);
+  const budgetTarget = useTripStore(selectBudgetTarget);
+  const setBudgetTarget = useTripStore(selectSetBudgetTarget);
 
   const [showForm, setShowForm] = useState(false);
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<BudgetCategory>('gas');
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetInput, setTargetInput] = useState('');
 
   // Aggregate totals by category, including stop estimated_costs
   const totalsByCategory: Record<BudgetCategory, number> = {
@@ -56,6 +62,25 @@ export function BudgetPanel() {
   // the trip-level total is route-agnostic, so add the active route's gas here.
   const displayTotal = tripTotal + gasCost;
 
+  // Remaining against the optional target budget. Negative = over budget.
+  const remaining = budgetTarget != null ? budgetTarget - displayTotal : null;
+  const overBudget = remaining != null && remaining < 0;
+  const usedPercent =
+    budgetTarget && budgetTarget > 0
+      ? Math.min(100, Math.round((displayTotal / budgetTarget) * 100))
+      : 0;
+
+  function openTargetEditor() {
+    setTargetInput(budgetTarget != null ? String(budgetTarget) : '');
+    setEditingTarget(true);
+  }
+
+  function saveTarget() {
+    const n = Number(targetInput);
+    setBudgetTarget(targetInput.trim() && n > 0 ? n : null);
+    setEditingTarget(false);
+  }
+
   async function submit() {
     const amt = Number(amount);
     if (!label.trim() || !amt || isNaN(amt)) return;
@@ -76,6 +101,66 @@ export function BudgetPanel() {
           {formatCurrency(displayTotal)}
         </div>
       </div>
+
+      {/* Clickable target budget. Setting one shows a remaining indicator and
+          lets AI suggestions fit within what's left. */}
+      {editingTarget ? (
+        <div className="flex items-center gap-2 rounded-lg border border-accent/40 bg-surface p-2">
+          <span className="text-sm text-fg-muted">Target $</span>
+          <Input
+            type="number"
+            min="0"
+            placeholder="e.g. 2000"
+            value={targetInput}
+            onChange={(e) => setTargetInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveTarget();
+              if (e.key === 'Escape') setEditingTarget(false);
+            }}
+            className="h-8 flex-1 font-mono"
+            autoFocus
+          />
+          <Button size="sm" onClick={saveTarget} className="h-8">
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ) : budgetTarget != null ? (
+        <button
+          onClick={openTargetEditor}
+          className="group w-full space-y-1.5 rounded-lg border border-border bg-surface/60 p-2.5 text-left hover:border-accent/40 transition-colors"
+        >
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1 text-fg-muted">
+              Target {formatCurrency(budgetTarget)}
+              <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </span>
+            <span
+              className={`font-mono font-semibold tabular-nums ${
+                overBudget ? 'text-danger' : 'text-accent'
+              }`}
+            >
+              {overBudget
+                ? `${formatCurrency(Math.abs(remaining!))} over`
+                : `${formatCurrency(remaining!)} left`}
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-surface overflow-hidden">
+            <div
+              className={`h-full transition-all duration-500 ${
+                overBudget ? 'bg-danger' : 'bg-accent'
+              }`}
+              style={{ width: `${usedPercent}%` }}
+            />
+          </div>
+        </button>
+      ) : (
+        <button
+          onClick={openTargetEditor}
+          className="w-full rounded-lg border border-dashed border-border px-3 py-2 text-xs text-fg-muted hover:text-accent hover:border-accent/40 transition-colors"
+        >
+          Set a target budget → let Claude suggest stops that fit
+        </button>
+      )}
 
       {/* Category bars */}
       <div className="space-y-1.5">

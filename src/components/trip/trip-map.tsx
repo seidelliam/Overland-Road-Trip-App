@@ -11,7 +11,7 @@ import {
   type Stop,
   type AISuggestion,
 } from '@/lib/types';
-import { Loader2, Crosshair } from 'lucide-react';
+import { Loader2, Crosshair, Pin, X } from 'lucide-react';
 
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
@@ -320,11 +320,18 @@ export function TripMap({
 
       let marker = markersRef.current[stop.id];
       if (!marker) {
+        // Outer element is positioned by Mapbox (it owns its `transform`), so we
+        // never touch its transform. All visuals + the hover scale live on an
+        // inner element — otherwise scaling the outer wipes Mapbox's translate
+        // and the marker snaps to the map's top-left until the next repaint.
         const el = document.createElement('div');
         el.className = 'mp-marker';
-        el.style.cssText = `
-          width: 32px;
-          height: 32px;
+        el.style.cssText = 'width:32px;height:32px;';
+        const inner = document.createElement('div');
+        inner.className = 'mp-marker-inner';
+        inner.style.cssText = `
+          width: 100%;
+          height: 100%;
           border-radius: 999px;
           background: ${color};
           color: #060809;
@@ -339,11 +346,13 @@ export function TripMap({
           cursor: pointer;
           transition: transform 0.15s ease;
         `;
+        inner.textContent = String(idx + 1);
+        el.appendChild(inner);
         el.addEventListener('mouseenter', () => {
-          el.style.transform = 'scale(1.15)';
+          inner.style.transform = 'scale(1.15)';
         });
         el.addEventListener('mouseleave', () => {
-          el.style.transform = 'scale(1)';
+          inner.style.transform = 'scale(1)';
         });
         marker = new mapboxgl.Marker({ element: el, draggable: interactive })
           .setLngLat([stop.lng, stop.lat])
@@ -363,20 +372,22 @@ export function TripMap({
           closeButton: true,
           closeOnClick: false,
         }).setHTML(
-          `<div style="min-width:180px"><div style="font-size:11px;color:var(--color-fg-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">${meta.emoji} ${meta.label}</div><div style="font-size:14px;font-weight:600;line-height:1.3">${escapeHtml(stop.name)}</div>${stop.address ? `<div style="font-size:12px;color:var(--color-fg-muted);margin-top:4px">${escapeHtml(stop.address)}</div>` : ''}</div>`,
+          `<div style="min-width:180px"><div class="mp-popup-photo"></div><div style="font-size:11px;color:var(--color-fg-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">${meta.emoji} ${meta.label}</div><div style="font-size:14px;font-weight:600;line-height:1.3">${escapeHtml(stop.name)}</div>${stop.address ? `<div style="font-size:12px;color:var(--color-fg-muted);margin-top:4px">${escapeHtml(stop.address)}</div>` : ''}</div>`,
         );
+        attachPopupPhoto(popup, stop.name, stop.lat, stop.lng);
         marker.setPopup(popup);
 
         markersRef.current[stop.id] = marker;
       } else {
         marker.setLngLat([stop.lng, stop.lat]);
-        const el = marker.getElement();
-        el.style.background = color;
-        el.style.boxShadow = `0 0 0 1.5px ${color}, 0 8px 16px -4px rgba(0,0,0,0.7)`;
+        const inner = marker.getElement().firstElementChild as HTMLElement;
+        inner.style.background = color;
+        inner.style.boxShadow = `0 0 0 1.5px ${color}, 0 8px 16px -4px rgba(0,0,0,0.7)`;
       }
 
       // Update label to position number
-      marker.getElement().textContent = String(idx + 1);
+      (marker.getElement().firstElementChild as HTMLElement).textContent =
+        String(idx + 1);
     });
   }, [
     stops,
@@ -413,11 +424,16 @@ export function TripMap({
         continue;
       }
       const meta = CATEGORY_META[s.category];
+      // Outer = Mapbox-positioned wrapper (don't touch its transform); inner
+      // carries the visuals + hover/active scale. See the stop-marker note above.
       const el = document.createElement('div');
       el.className = 'mp-suggestion-marker';
-      el.style.cssText = `
-        width: 26px;
-        height: 26px;
+      el.style.cssText = 'width:26px;height:26px;';
+      const inner = document.createElement('div');
+      inner.className = 'mp-suggestion-marker-inner';
+      inner.style.cssText = `
+        width: 100%;
+        height: 100%;
         border-radius: 999px;
         background: var(--color-surface);
         color: ${meta.color};
@@ -431,7 +447,8 @@ export function TripMap({
         cursor: pointer;
         transition: transform 0.15s ease, opacity 0.15s ease;
       `;
-      el.textContent = meta.emoji;
+      inner.textContent = meta.emoji;
+      el.appendChild(inner);
 
       el.addEventListener('mouseenter', () =>
         useTripStore.getState().setHoveredSuggestion(s.id),
@@ -451,6 +468,7 @@ export function TripMap({
           lat: s.lat,
           address: s.description,
           category: s.category,
+          estimated_cost: s.estimated_cost ?? null,
         });
       });
 
@@ -458,13 +476,18 @@ export function TripMap({
         .setLngLat([s.lng, s.lat])
         .addTo(map);
 
+      const costLine =
+        s.estimated_cost != null
+          ? `<div style="font-size:11px;color:var(--color-fg);margin-top:4px;font-weight:600">≈ $${Math.round(s.estimated_cost).toLocaleString()}</div>`
+          : '';
       const popup = new mapboxgl.Popup({
         offset: 16,
         closeButton: false,
         closeOnClick: false,
       }).setHTML(
-        `<div style="min-width:180px"><div style="font-size:11px;color:var(--color-fg-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">${meta.emoji} Claude suggestion</div><div style="font-size:14px;font-weight:600;line-height:1.3">${escapeHtml(s.name)}</div><div style="font-size:12px;color:var(--color-fg-muted);margin-top:4px">${escapeHtml(s.description)}</div><div style="font-size:11px;color:var(--color-accent);margin-top:6px">Click pin to add</div></div>`,
+        `<div style="min-width:180px"><div class="mp-popup-photo"></div><div style="font-size:11px;color:var(--color-fg-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">${meta.emoji} Claude suggestion</div><div style="font-size:14px;font-weight:600;line-height:1.3">${escapeHtml(s.name)}</div><div style="font-size:12px;color:var(--color-fg-muted);margin-top:4px">${escapeHtml(s.description)}</div>${costLine}<div style="font-size:11px;color:var(--color-accent);margin-top:6px">Click pin to add</div></div>`,
       );
+      attachPopupPhoto(popup, s.name, s.lat, s.lng);
       marker.setPopup(popup);
       suggestionMarkersRef.current[s.id] = marker;
     }
@@ -476,11 +499,11 @@ export function TripMap({
     const map = mapRef.current;
     if (!map) return;
     for (const [id, marker] of Object.entries(suggestionMarkersRef.current)) {
-      const el = marker.getElement();
+      const inner = marker.getElement().firstElementChild as HTMLElement;
       const popup = marker.getPopup();
       const active = id === hoveredSuggestionId;
-      el.style.transform = active ? 'scale(1.25)' : 'scale(1)';
-      el.style.opacity = active ? '1' : '0.85';
+      inner.style.transform = active ? 'scale(1.25)' : 'scale(1)';
+      inner.style.opacity = active ? '1' : '0.85';
       if (popup) {
         if (active && !popup.isOpen()) marker.togglePopup();
         else if (!active && popup.isOpen()) marker.togglePopup();
@@ -546,8 +569,59 @@ export function TripMap({
           </div>
         </div>
       )}
+      {/* Drop-a-pin control, overlaid on the map as a small round button. */}
+      {interactive && (
+        <button
+          type="button"
+          onClick={() => setAddingStop(!isAddingStop)}
+          aria-label={isAddingStop ? 'Cancel dropping a pin' : 'Drop a pin on the map'}
+          title={isAddingStop ? 'Cancel' : 'Drop a pin on the map'}
+          className={`absolute bottom-4 left-4 z-10 grid h-11 w-11 place-items-center rounded-full shadow-lg transition-colors ${
+            isAddingStop
+              ? 'bg-accent text-bg'
+              : 'glass text-fg hover:text-accent'
+          }`}
+        >
+          {isAddingStop ? (
+            <X className="h-5 w-5" />
+          ) : (
+            <Pin className="h-5 w-5" />
+          )}
+        </button>
+      )}
     </div>
   );
+}
+
+// Lazily load a representative photo into a popup the first time it opens, so we
+// don't fetch images for markers the user never hovers. The popup HTML reserves
+// an empty `.mp-popup-photo` slot that we fill once the image resolves. Reuses
+// the same /api/place-info endpoint as the stop detail card (Google Places when
+// configured, else Wikipedia).
+function attachPopupPhoto(
+  popup: mapboxgl.Popup,
+  name: string,
+  lat: number,
+  lng: number,
+) {
+  let loaded = false;
+  popup.on('open', () => {
+    if (loaded) return;
+    loaded = true;
+    const params = new URLSearchParams({ q: name, lat: String(lat), lng: String(lng) });
+    fetch(`/api/place-info?${params}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const url = data?.photos?.[0]?.url as string | undefined;
+        if (!url) return;
+        const slot = popup
+          .getElement()
+          ?.querySelector('.mp-popup-photo') as HTMLElement | null;
+        if (!slot) return;
+        slot.innerHTML = `<img src="${escapeHtml(url)}" alt="" style="width:100%;height:96px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" />`;
+      })
+      .catch(() => {});
+  });
 }
 
 function escapeHtml(s: string): string {
